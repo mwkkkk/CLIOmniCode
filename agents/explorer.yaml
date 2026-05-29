@@ -1,0 +1,10 @@
+id: explorer
+name: Explorer
+description: Codebase search and structure analysis. Read-only.
+model: explorer
+tools:
+  - read
+  - grep
+  - glob
+readonly: true
+max_turns: 15

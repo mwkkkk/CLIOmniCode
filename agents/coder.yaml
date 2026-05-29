@@ -1,0 +1,13 @@
+id: coder
+name: Coder
+description: Implements code changes and runs commands.
+model: coder
+tools:
+  - read
+  - write
+  - edit
+  - bash
+  - grep
+  - glob
+readonly: false
+max_turns: 25

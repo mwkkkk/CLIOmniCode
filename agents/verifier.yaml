@@ -1,0 +1,9 @@
+id: verifier
+name: Verifier
+description: Runs tests and validates changes.
+model: verifier
+tools:
+  - read
+  - bash
+readonly: false
+max_turns: 10

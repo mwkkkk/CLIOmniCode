@@ -1,0 +1,12 @@
+id: conductor
+name: Conductor
+description: Main orchestrator that decomposes tasks and dispatches to specialist agents.
+model: conductor
+tools:
+  - read
+  - grep
+  - glob
+  - dispatch
+  - ask_user
+readonly: false
+max_turns: 30

@@ -1,0 +1,10 @@
+id: planner
+name: Planner
+description: Creates implementation plans without modifying files.
+model: planner
+tools:
+  - read
+  - grep
+  - glob
+readonly: true
+max_turns: 15

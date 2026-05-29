@@ -1,0 +1,10 @@
+id: reviewer
+name: Reviewer
+description: Reviews code quality and potential issues. Read-only.
+model: reviewer
+tools:
+  - read
+  - grep
+  - glob
+readonly: true
+max_turns: 15

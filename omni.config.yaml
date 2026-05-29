@@ -1,0 +1,44 @@
+llm:
+  provider: qwen
+
+models:
+  conductor: qwen-plus
+  coder: qwen3-coder-plus
+  explorer: qwen-flash
+  planner: qwen-plus
+  reviewer: qwen-plus
+  verifier: qwen-flash
+  reflection: qwen-flash
+
+agents:
+  conductor:
+    tools: [read, grep, glob, dispatch, ask_user]
+    readonly: false
+    max_turns: 30
+  planner:
+    tools: [read, grep, glob]
+    readonly: true
+    max_turns: 15
+  explorer:
+    tools: [read, grep, glob]
+    readonly: true
+    max_turns: 15
+  coder:
+    tools: [read, write, edit, bash, grep, glob]
+    readonly: false
+    max_turns: 25
+  reviewer:
+    tools: [read, grep, glob]
+    readonly: true
+    max_turns: 15
+  verifier:
+    tools: [read, bash]
+    readonly: false
+    max_turns: 10
+
+memory:
+  reflection_confidence_threshold: 0.7
+  semantic_recall_top_k: 5
+
+session:
+  data_dir: ~/.omni
