@@ -37,6 +37,7 @@ omni
 Config is resolved in order: `./omni.config.yaml` → `~/.omni/config.yaml` → package default.
 
 Optional: copy global config once:
+
 ```bash
 mkdir -p ~/.omni && cp /path/to/OmniCode/omni.config.yaml ~/.omni/config.yaml
 ```
@@ -51,6 +52,3 @@ mkdir -p ~/.omni && cp /path/to/OmniCode/omni.config.yaml ~/.omni/config.yaml
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/DESIGN_DECISIONS.md](docs/DESIGN_DECISIONS.md).
 
-## License
-
-MIT
