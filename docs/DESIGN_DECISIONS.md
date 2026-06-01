@@ -84,13 +84,13 @@
 - **Choice**: Config lookup: explicit path → `OMNI_CONFIG` → `./omni.config.yaml` → `~/.omni/config.yaml` → package default.
 - **Why**: `omni` runs from any project directory via `npm link`; each project can override models/agents while sharing a global fallback.
 
-## 11. Intentionally skipped from CCB
+## 11. MCP via Tool adapter (not AgentLoop fork)
 
-| Feature | Reason |
-|---------|--------|
-| Pipe IPC / LAN | Out of scope for personal CLI |
-| MCP protocol | v2; built-in tools sufficient for MVP |
-| React/Ink TUI | readline first; upgrade later |
-| 88 feature flags | `omni.config.yaml` is enough |
-| GrowthBook / Sentry | Local trace only for now |
-| Vector memory search | recallHint + side-query sufficient for MVP scale |
+- **Choice**: MCP servers connect over stdio (`@modelcontextprotocol/sdk`); each MCP tool is adapted to the existing `Tool` interface and merged into `ToolRegistry` at runtime.
+- **Naming**: `mcp__{serverId}__{toolName}` prevents collisions with builtin `read`/`grep`/etc.
+- **Why**: AgentLoop, permission ask, and LLM function calling stay unchanged; new capabilities are config-driven extensions.
+- **First server**: GitHub MCP (`@modelcontextprotocol/server-github`) — issues, PRs, remote file read. Builtin tools handle local files; MCP handles external SaaS APIs.
+- **Scope control**: Per-server `agents` list and `tools` whitelist in `omni.config.yaml`. Default demo exposes read-only GitHub tools to conductor only.
+- **Permissions**: MCP write tools (`create_*`, `merge_*`, …) map to `isDestructive: true` and use the same REPL ask flow as `write`/`bash`.
+- **Failure mode**: If MCP fails to connect (missing token, spawn error), log warning and continue with builtin tools — no hard crash.
+- **Not doing (yet)**: HTTP/SSE MCP transport, multiple concurrent MCP servers beyond config list, OAuth browser flow.

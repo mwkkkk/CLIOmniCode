@@ -15,7 +15,8 @@ import type { ModelRouter } from '../llm/model-router.js';
 import { QwenProvider } from '../llm/qwen-provider.js';
 import type { AgentRole } from '../llm/types.js';
 import { handoffToToolResult, type HandoffReport } from './types.js';
-import { createToolRegistry } from '../tools/registry.js';
+import { buildAgentToolRegistry } from '../mcp/build-agent-registry.js';
+import type { McpManager } from '../mcp/McpManager.js';
 import type { ToolContext } from '../tools/types.js';
 
 /** dispatch 工具中的 agent 名 → ModelRouter 角色 */
@@ -41,6 +42,7 @@ export class AgentRouter {
   constructor(
     private provider: QwenProvider,
     private modelRouter: ModelRouter,
+    private mcpManager: McpManager | null = null,
   ) {}
 
   /** 同步派发：阻塞等待子 Agent 完成，返回 HandoffReport */
@@ -68,7 +70,7 @@ export class AgentRouter {
       throw new Error(`No profile for agent: ${params.agent}`);
     }
 
-    const registry = createToolRegistry(profile.tools);
+    const registry = await buildAgentToolRegistry(params.agent, this.mcpManager);
     const loop = new AgentLoop({
       provider: this.provider,
       model: this.modelRouter.resolve(role),

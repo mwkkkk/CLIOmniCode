@@ -22,7 +22,8 @@ import type { ConsolidationResult } from '../memory/types.js';
 import { AgentRouter } from '../orchestrator/AgentRouter.js';
 import { hashProjectPath, SessionIndex } from '../session/SessionIndex.js';
 import { TranscriptStore } from '../session/TranscriptStore.js';
-import { createToolRegistry } from '../tools/registry.js';
+import { buildAgentToolRegistry } from '../mcp/build-agent-registry.js';
+import { McpManager } from '../mcp/McpManager.js';
 import type { ToolContext } from '../tools/types.js';
 
 /** query() 的入参：一次用户输入所需的全部上下文与回调 */
@@ -46,6 +47,7 @@ export class SessionEngine {
   private provider = new QwenProvider();
   private contextManager = new ContextManager(this.provider);
   private workingStore = new WorkingStore();
+  private mcpManager: McpManager | null = null;
 
   async query(options: QueryOptions): Promise<QueryResult> {
     const config = await loadConfig();
@@ -63,10 +65,11 @@ export class SessionEngine {
     const historyMessages = await this.loadWorkingMemory(activeSession.id, transcript);
 
     const modelRouter = new ModelRouter(config.models);
-    const agentRouter = new AgentRouter(this.provider, modelRouter);
+    const mcpManager = await this.getMcpManager();
+    const agentRouter = new AgentRouter(this.provider, modelRouter, mcpManager);
 
     const conductorProfile = config.agents.conductor;
-    const registry = createToolRegistry(conductorProfile.tools);
+    const registry = await buildAgentToolRegistry('conductor', mcpManager);
 
     const systemPrompt = await this.contextManager.buildSystemPrompt({
       cwd: options.cwd,
@@ -194,6 +197,23 @@ export class SessionEngine {
     }
 
     return pipeline.run({ projectHash }, dataDir);
+  }
+
+  private async getMcpManager(): Promise<McpManager | null> {
+    const config = await loadConfig();
+    if (!config.mcp?.enabled) return null;
+
+    if (!this.mcpManager) {
+      this.mcpManager = new McpManager();
+      await this.mcpManager.connect();
+    }
+    return this.mcpManager;
+  }
+
+  /** 关闭 MCP 连接（REPL 退出时调用） */
+  async close(): Promise<void> {
+    await this.mcpManager?.close();
+    this.mcpManager = null;
   }
 
   private async loadWorkingMemory(sessionId: string, transcript: TranscriptStore) {
