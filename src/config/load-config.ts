@@ -19,6 +19,17 @@ export interface AgentProfileConfig {
   max_turns: number;
 }
 
+/** Consolidation 阶段配置 */
+export interface ConsolidationConfig {
+  auto: boolean;
+  min_pending_semantic: number;
+  min_pending_procedural: number;
+  min_episodes_since_last: number;
+  procedural_min_steps: number;
+  procedural_confidence: number;
+  semantic_confidence: number;
+}
+
 /** omni.config.yaml 的完整结构 */
 export interface OmniConfig {
   llm: { provider: string };
@@ -38,10 +49,42 @@ export interface OmniConfig {
     procedural_recall_top_k: number;
     episodic_recall_top_k: number;
     entity_recall_top_k: number;
+    /** 启用 flash 侧查询精选记忆（对齐 CCB findRelevantMemories） */
+    smart_recall?: boolean;
+    /** 侧查询最终注入的记忆条数上限（跨类型合计） */
+    recall_max_total?: number;
+    consolidation?: ConsolidationConfig;
   };
   session: {
     data_dir: string;
   };
+}
+
+export const DEFAULT_CONSOLIDATION_CONFIG: ConsolidationConfig = {
+  auto: true,
+  min_pending_semantic: 3,
+  min_pending_procedural: 2,
+  min_episodes_since_last: 5,
+  procedural_min_steps: 3,
+  procedural_confidence: 0.85,
+  semantic_confidence: 0.75,
+};
+
+/** 获取 consolidation 配置（兼容旧配置文件） */
+export function getConsolidationConfig(config: OmniConfig): ConsolidationConfig {
+  return { ...DEFAULT_CONSOLIDATION_CONFIG, ...config.memory.consolidation };
+}
+
+export const DEFAULT_RECALL_MAX_TOTAL = 5;
+
+/** 是否启用智能记忆召回 */
+export function isSmartRecallEnabled(config: OmniConfig): boolean {
+  return config.memory.smart_recall !== false;
+}
+
+/** 侧查询最终注入条数上限 */
+export function getRecallMaxTotal(config: OmniConfig): number {
+  return config.memory.recall_max_total ?? DEFAULT_RECALL_MAX_TOTAL;
 }
 
 // 进程内缓存，避免重复读盘

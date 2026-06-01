@@ -10,6 +10,7 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { fallbackRecallHint, scoreByQuery } from './recall-utils.js';
 import type { SemanticCandidate, SemanticFact } from './types.js';
 
 export class SemanticStore {
@@ -36,6 +37,9 @@ export class SemanticStore {
       id: randomUUID(),
       category: candidate.category,
       content: candidate.content,
+      recallHint:
+        candidate.recallHint ||
+        fallbackRecallHint([candidate.category, candidate.content]),
       confidence: candidate.confidence,
       sourceSessionId: candidate.sourceSessionId,
       createdAt: new Date().toISOString(),
@@ -53,14 +57,12 @@ export class SemanticStore {
    */
   async recall(query: string, topK = 5): Promise<SemanticFact[]> {
     const facts = await this.list();
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
 
     const scored = facts
-      .map((fact) => {
-        const text = fact.content.toLowerCase();
-        const score = terms.reduce((acc, term) => (text.includes(term) ? acc + 1 : acc), 0);
-        return { fact, score };
-      })
+      .map((fact) => ({
+        fact,
+        score: scoreByQuery(query, [fact.recallHint, fact.content, fact.category]),
+      }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
 

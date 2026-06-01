@@ -42,6 +42,16 @@ memory:
   procedural_recall_top_k: 3
   episodic_recall_top_k: 3
   entity_recall_top_k: 10
+  smart_recall: true
+  recall_max_total: 5
+  consolidation:
+    auto: true
+    min_pending_semantic: 3
+    min_pending_procedural: 2
+    min_episodes_since_last: 5
+    procedural_min_steps: 3
+    procedural_confidence: 0.85
+    semantic_confidence: 0.75
 
 session:
   data_dir: ~/.omni

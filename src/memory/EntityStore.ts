@@ -10,6 +10,7 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { fallbackRecallHint, scoreByQuery } from './recall-utils.js';
 import type { EntityCandidate, EntityFact } from './types.js';
 
 export class EntityStore {
@@ -31,6 +32,9 @@ export class EntityStore {
 
     if (duplicate) {
       duplicate.value = candidate.value;
+      duplicate.recallHint =
+        candidate.recallHint ||
+        fallbackRecallHint([candidate.entity, candidate.attribute, candidate.value]);
       duplicate.confidence = candidate.confidence;
       duplicate.sourceSessionId = candidate.sourceSessionId;
       duplicate.createdAt = new Date().toISOString();
@@ -44,6 +48,9 @@ export class EntityStore {
       entity: candidate.entity,
       attribute: candidate.attribute,
       value: candidate.value,
+      recallHint:
+        candidate.recallHint ||
+        fallbackRecallHint([candidate.entity, candidate.attribute, candidate.value]),
       confidence: candidate.confidence,
       sourceSessionId: candidate.sourceSessionId,
       createdAt: new Date().toISOString(),
@@ -57,14 +64,17 @@ export class EntityStore {
 
   async recall(query: string, topK = 10): Promise<EntityFact[]> {
     const facts = await this.list();
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
 
     const scored = facts
-      .map((fact) => {
-        const text = `${fact.entity} ${fact.attribute} ${fact.value}`.toLowerCase();
-        const score = terms.reduce((acc, term) => (text.includes(term) ? acc + 1 : acc), 0);
-        return { fact, score };
-      })
+      .map((fact) => ({
+        fact,
+        score: scoreByQuery(query, [
+          fact.recallHint,
+          fact.entity,
+          fact.attribute,
+          fact.value,
+        ]),
+      }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
 

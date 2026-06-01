@@ -7,6 +7,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { fallbackRecallHint, scoreByQuery } from './recall-utils.js';
 import type { Episode } from './types.js';
 
 export class EpisodicStore {
@@ -31,16 +32,18 @@ export class EpisodicStore {
 
   async recall(query: string, topK = 3): Promise<Episode[]> {
     const episodes = await this.list();
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
 
     const scored = episodes
-      .map((episode) => {
-        const text = [episode.title, episode.narrative, episode.outcome, ...episode.tags]
-          .join(' ')
-          .toLowerCase();
-        const score = terms.reduce((acc, term) => (text.includes(term) ? acc + 1 : acc), 0);
-        return { episode, score };
-      })
+      .map((episode) => ({
+        episode,
+        score: scoreByQuery(query, [
+          episode.recallHint,
+          episode.title,
+          episode.narrative,
+          episode.outcome,
+          ...episode.tags,
+        ]),
+      }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
 
