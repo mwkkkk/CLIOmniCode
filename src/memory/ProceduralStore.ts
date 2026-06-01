@@ -9,6 +9,7 @@
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { fallbackRecallHint, scoreByQuery } from './recall-utils.js';
 import type { ProceduralCandidate, Procedure } from './types.js';
 
 export class ProceduralStore {
@@ -32,6 +33,9 @@ export class ProceduralStore {
       title: candidate.title,
       steps: candidate.steps,
       tags: candidate.tags,
+      recallHint:
+        candidate.recallHint ||
+        fallbackRecallHint([candidate.title, ...candidate.tags]),
       confidence: candidate.confidence,
       sourceSessionId: candidate.sourceSessionId,
       createdAt: new Date().toISOString(),
@@ -44,14 +48,17 @@ export class ProceduralStore {
 
   async recall(query: string, topK = 3): Promise<Procedure[]> {
     const procedures = await this.list();
-    const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
 
     const scored = procedures
-      .map((proc) => {
-        const text = [proc.title, ...proc.tags, ...proc.steps].join(' ').toLowerCase();
-        const score = terms.reduce((acc, term) => (text.includes(term) ? acc + 1 : acc), 0);
-        return { proc, score };
-      })
+      .map((proc) => ({
+        proc,
+        score: scoreByQuery(query, [
+          proc.recallHint,
+          proc.title,
+          ...proc.tags,
+          ...proc.steps,
+        ]),
+      }))
       .filter(({ score }) => score > 0)
       .sort((a, b) => b.score - a.score);
 

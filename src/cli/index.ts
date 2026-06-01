@@ -6,6 +6,7 @@
  * - omni / omni chat  → 交互式 REPL
  * - omni run <prompt> → 单次问答（print 模式）
  * - omni sessions     → 列出当前项目的会话
+ * - omni consolidate  → 手动触发记忆 Consolidation
  */
 import 'dotenv/config'; // 加载 .env；不覆盖已存在的 shell 环境变量
 import { resolve } from 'node:path';
@@ -78,6 +79,22 @@ program
     for (const s of sessions) {
       console.log(`${s.id}\t${s.status}\t${s.title}\t${s.lastActiveAt}`);
     }
+  });
+
+/** 手动触发记忆 Consolidation（跨 episode 归纳候选池） */
+program
+  .command('consolidate')
+  .description('Run memory consolidation for current project (promote pending candidates)')
+  .option('-c, --cwd <path>', 'Working directory', process.cwd())
+  .action(async (opts: { cwd: string }) => {
+    const engine = new SessionEngine();
+    const result = await engine.consolidate(resolve(opts.cwd));
+
+    console.log(chalk.cyan('Consolidation complete:'));
+    console.log(`  Promoted semantic facts: ${result.promotedSemantic}`);
+    console.log(`  Promoted procedures:     ${result.promotedProcedural}`);
+    console.log(`  Rejected candidates:     ${result.rejected}`);
+    console.log(`  Kept pending:            ${result.kept}`);
   });
 
 program.parse();
