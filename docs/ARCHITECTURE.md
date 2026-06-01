@@ -12,14 +12,17 @@ Core capabilities:
 - **Three-tier memory** — L1 working, L2 episodic/semantic/procedural, L3 entity
 - **Two-phase L2 promotion** — Reflection at session end, Consolidation across episodes
 - **Smart recall** — LLM side-query selects relevant memories from a full manifest
+- **MCP external tools** — GitHub API via Model Context Protocol (stdio), bridged into the existing `Tool` registry
 
 ## Layers
 
 ```
 CLI (Commander + readline REPL)
   → SessionEngine (session lifecycle, transcript, reflection, consolidation)
+    → McpManager (stdio MCP servers → dynamic tools)
     → AgentLoop (core while-loop: LLM → tools → LLM)
       → Tools (read, write, edit, bash, grep, glob, ask_user, dispatch)
+      → MCP tools (mcp__{server}__{tool}, e.g. mcp__github__search_issues)
       → AgentRouter (sub-agent dispatch → HandoffReport)
     → ContextManager (system prompt + OMNI.md + smart memory recall)
       → MemoryRecallSelector (flash side-query over manifest)
@@ -32,7 +35,11 @@ CLI (Commander + readline REPL)
 
 | Path | Responsibility |
 |------|----------------|
-| `src/cli/index.ts` | Commander entry: `chat`, `run`, `sessions`, `consolidate` |
+| `src/cli/index.ts` | Commander entry: `chat`, `run`, `sessions`, `consolidate`, `mcp` |
+| `src/mcp/McpManager.ts` | Start MCP servers, collect tools, lifecycle |
+| `src/mcp/McpSession.ts` | Single stdio MCP client (`@modelcontextprotocol/sdk`) |
+| `src/mcp/McpToolAdapter.ts` | MCP tool → OmniCode `Tool`; namespaced as `mcp__{server}__{tool}` |
+| `src/mcp/build-agent-registry.ts` | Merge builtin + MCP tools per agent profile |
 | `src/cli/repl.ts` | Interactive REPL + slash commands |
 | `src/engine/AgentLoop.ts` | Core agentic loop (LLM ↔ tools) |
 | `src/engine/SessionEngine.ts` | Session orchestration, L1 persistence, reflection/consolidation triggers |
@@ -58,7 +65,7 @@ Each agent has a dedicated model and tool set defined in `omni.config.yaml`:
 
 | Agent | Model (default) | Tools | Role |
 |-------|-----------------|-------|------|
-| conductor | qwen-plus | read, grep, glob, dispatch, ask_user | Orchestrates work, delegates to specialists |
+| conductor | qwen-plus | read, grep, glob, dispatch, ask_user + MCP (if enabled) | Orchestrates work, delegates to specialists |
 | planner | qwen-plus | read, grep, glob | Read-only planning |
 | explorer | qwen-flash | read, grep, glob | Read-only codebase exploration |
 | coder | qwen3-coder-plus | read, write, edit, bash, grep, glob | Implementation |
@@ -155,6 +162,55 @@ Conductor calls dispatch(agent, task)
 - Sub-agent `write` / `edit` / `bash` also require user confirmation in REPL.
 - `HandoffBus` exists for future trace/debug but is not wired into `AgentRouter` yet.
 
+## MCP (External Tools)
+
+OmniCode extends the agent beyond the local filesystem via [Model Context Protocol](https://modelcontextprotocol.io). MCP servers run as child processes (stdio); their tools are adapted at runtime into the same `Tool` interface used by builtin tools. **AgentLoop is unchanged.**
+
+```mermaid
+flowchart LR
+    AL["AgentLoop"] --> TR["ToolRegistry"]
+    TR --> Builtin["read / write / bash …"]
+    TR --> Adapter["McpToolAdapter"]
+    Adapter --> Session["McpSession"]
+    Session --> Server["GitHub MCP server (stdio)"]
+    Server --> API["GitHub REST API"]
+```
+
+### Startup flow
+
+```
+SessionEngine.query()
+  → McpManager.connect()          # once per process
+  → spawn MCP server (stdio)
+  → listTools() from each server
+  → McpToolAdapter → Tool[]
+  → buildAgentToolRegistry(agentId)  # merge with builtin tools
+  → AgentLoop.run()
+```
+
+- Connection is lazy and cached on `SessionEngine`; REPL exit calls `engine.close()` to tear down MCP child processes.
+- If a server fails to start (missing token, spawn error), OmniCode logs a warning and continues with builtin tools only.
+
+### Tool naming and permissions
+
+| Concern | Behavior |
+|---------|----------|
+| Naming | `mcp__{serverId}__{originalToolName}` avoids collisions with builtin tools |
+| Agent scope | `mcp.servers.{id}.agents` controls which agents receive that server's tools (default: all) |
+| Tool whitelist | `mcp.servers.{id}.tools` limits exposed MCP tools (default: all from server) |
+| Destructive ops | `create_*`, `merge_*`, etc. marked `isDestructive`; subject to permission ask like `write`/`bash` |
+| Env vars | `${GITHUB_TOKEN}` in config expanded from `process.env`; empty values do not override shell env |
+
+### Default GitHub MCP tools (read-only demo)
+
+When `mcp.enabled: true` and `GITHUB_TOKEN` (or `GITHUB_PERSONAL_ACCESS_TOKEN`) is set:
+
+- `mcp__github__search_issues`, `search_code`, `search_repositories`, `search_users`
+- `mcp__github__list_issues`, `get_issue`, `list_pull_requests`, `get_pull_request`, `get_pull_request_files`
+- `mcp__github__get_file_contents`, `list_commits`
+
+Write tools (create issue, merge PR, push files) can be added to the `tools` whitelist; they still require user confirmation in REPL ask mode.
+
 ## Data Layout
 
 ```
@@ -183,7 +239,7 @@ Resolved in order:
 4. `~/.omni/config.yaml` (user global)
 5. Package-bundled `omni.config.yaml` (default)
 
-Key memory settings in `omni.config.yaml`:
+Key settings in `omni.config.yaml`:
 
 ```yaml
 memory:
@@ -195,7 +251,20 @@ memory:
     min_pending_semantic: 3
     min_pending_procedural: 2
     min_episodes_since_last: 5
+
+mcp:
+  enabled: true
+  servers:
+    github:
+      command: node
+      env:
+        GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+      agents: [conductor]
+      tools: [search_issues, list_pull_requests, ...]  # optional whitelist
+      destructive: [create_issue, merge_pull_request, ...]
 ```
+
+Set `GITHUB_TOKEN` in the shell or `~/.omni/env`. Fine-grained PAT with **Public repositories (read-only)** is sufficient for the default tool set.
 
 ## Commands
 
@@ -206,6 +275,7 @@ omni run "..."        # Single-shot mode
 omni run "..." --session <id>   # Resume a session
 omni sessions         # List sessions for current project
 omni consolidate      # Force memory consolidation for current project
+omni mcp              # List MCP tools loaded from config
 ```
 
 All commands accept `-c, --cwd <path>` to set the working directory.

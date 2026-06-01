@@ -55,3 +55,33 @@ memory:
 
 session:
   data_dir: ~/.omni
+
+# GitHub MCP：需设置 GITHUB_TOKEN 或 GITHUB_PERSONAL_ACCESS_TOKEN
+mcp:
+  enabled: true
+  servers:
+    github:
+      command: node
+      env:
+        GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}"
+      agents: [conductor]
+      # 演示用只读工具白名单；省略则暴露 server 全部 tools
+      tools:
+        - search_repositories
+        - search_code
+        - search_issues
+        - search_users
+        - get_file_contents
+        - list_issues
+        - get_issue
+        - list_pull_requests
+        - get_pull_request
+        - get_pull_request_files
+        - list_commits
+      destructive:
+        - create_issue
+        - create_pull_request
+        - merge_pull_request
+        - create_or_update_file
+        - push_files
+        - add_issue_comment

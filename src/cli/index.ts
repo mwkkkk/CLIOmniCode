@@ -60,6 +60,31 @@ program
 
     process.stdout.write('\n');
     console.log(chalk.gray(`\n[session ${result.sessionId} · ${result.turns} turns]`));
+    await engine.close();
+  });
+
+/** 列出已连接的 MCP 工具 */
+program
+  .command('mcp')
+  .description('List MCP tools loaded from config')
+  .action(async () => {
+    const { McpManager } = await import('../mcp/McpManager.js');
+    const manager = new McpManager();
+    await manager.connect();
+    const tools = manager.getAllTools();
+
+    if (!tools.length) {
+      console.log('No MCP tools loaded. Check mcp.enabled and GITHUB_TOKEN in omni.config.yaml.');
+      await manager.close();
+      return;
+    }
+
+    for (const tool of tools) {
+      const mode = tool.isDestructive ? 'write' : 'read';
+      console.log(`${tool.name}\t[${mode}]\t${tool.description.slice(0, 60)}`);
+    }
+
+    await manager.close();
   });
 
 /** 列出会话；注意：只显示与 --cwd 对应项目的 session（按 projectHash 过滤） */

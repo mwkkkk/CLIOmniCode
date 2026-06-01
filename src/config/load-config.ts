@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { parse } from 'yaml';
 import type { ModelRouter } from '../llm/model-router.js';
 import { ModelRouter as ModelRouterImpl } from '../llm/model-router.js';
+import type { McpConfig } from '../mcp/types.js';
 
 /** 单个 Agent 的配置：可用工具、是否只读、最大循环轮数 */
 export interface AgentProfileConfig {
@@ -58,6 +59,7 @@ export interface OmniConfig {
   session: {
     data_dir: string;
   };
+  mcp?: McpConfig;
 }
 
 export const DEFAULT_CONSOLIDATION_CONFIG: ConsolidationConfig = {

@@ -80,5 +80,6 @@ export async function startRepl(cwd: string): Promise<void> {
     await engine.endSession(sessionId, cwd);
   }
 
+  await engine.close();
   rl.close();
 }

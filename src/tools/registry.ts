@@ -25,11 +25,21 @@ const ALL_TOOLS: Tool[] = [
 /**
  * 创建工具注册表
  * @param allowedNames 若传入，只注册指定名称的工具（按 Agent 配置过滤）
+ * @param extraTools MCP 等外部工具，按 allowedNames 过滤后合并
  */
-export function createToolRegistry(allowedNames?: string[]): ToolRegistry {
+export function createToolRegistry(
+  allowedNames?: string[],
+  extraTools: Tool[] = [],
+): ToolRegistry {
   const registry: ToolRegistry = new Map();
 
   for (const tool of ALL_TOOLS) {
+    if (!allowedNames || allowedNames.includes(tool.name)) {
+      registry.set(tool.name, tool);
+    }
+  }
+
+  for (const tool of extraTools) {
     if (!allowedNames || allowedNames.includes(tool.name)) {
       registry.set(tool.name, tool);
     }
