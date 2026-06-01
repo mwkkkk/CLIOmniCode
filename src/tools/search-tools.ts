@@ -1,3 +1,9 @@
+/**
+ * 搜索工具：grep / glob
+ *
+ * 底层调用 ripgrep (rg)，需在系统中安装 rg。
+ * 注意：当前未对搜索路径做 cwd 边界限制（与 read/write 不同）。
+ */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
@@ -5,6 +11,7 @@ import type { Tool } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
+/** 封装 rg 调用，exit code 1 表示无匹配（非错误） */
 async function runRipgrep(args: string[], cwd: string): Promise<string> {
   try {
     const { stdout } = await execFileAsync('rg', args, {
@@ -20,6 +27,7 @@ async function runRipgrep(args: string[], cwd: string): Promise<string> {
   }
 }
 
+/** 内容搜索：正则匹配文件内容，返回行号+路径 */
 export const grepTool: Tool<{ pattern: string; path?: string; glob?: string }> = {
   name: 'grep',
   description: 'Search file contents with ripgrep. Returns matching lines with paths.',
@@ -44,10 +52,11 @@ export const grepTool: Tool<{ pattern: string; path?: string; glob?: string }> =
     if (input.glob) args.push('--glob', input.glob);
     args.push(input.path ?? '.');
     const output = await runRipgrep(args, context.cwd);
-    return { success: true, output: output.slice(0, 30_000) };
+    return { success: true, output: output.slice(0, 30_000) }; // 截断防 context 爆炸
   },
 };
 
+/** 文件路径匹配：按 glob 模式找文件 */
 export const globTool: Tool<{ pattern: string; path?: string }> = {
   name: 'glob',
   description: 'Find files matching a glob pattern.',

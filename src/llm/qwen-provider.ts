@@ -1,3 +1,11 @@
+/**
+ * 千问（DashScope）LLM Provider
+ *
+ * 通过 OpenAI 兼容接口调用阿里云百炼：
+ * - Base URL: https://dashscope.aliyuncs.com/compatible-mode/v1
+ * - 支持流式输出 + Function Calling
+ * - 流式 tool_calls 需经 ToolCallAccumulator 聚合后才能执行
+ */
 import OpenAI from 'openai';
 import type {
   ChatCompletionMessageParam,
@@ -12,6 +20,7 @@ import type {
   ToolDefinition,
 } from './types.js';
 
+/** 内部 ToolDefinition → OpenAI tools 参数格式 */
 function toOpenAITools(tools: ToolDefinition[]): ChatCompletionTool[] {
   return tools.map((tool) => ({
     type: 'function' as const,
@@ -23,6 +32,7 @@ function toOpenAITools(tools: ToolDefinition[]): ChatCompletionTool[] {
   }));
 }
 
+/** 内部 ChatMessage → OpenAI messages 格式（含 tool / tool_calls 角色） */
 function toOpenAIMessages(messages: ChatParams['messages']): ChatCompletionMessageParam[] {
   return messages.map((message) => {
     if (message.role === 'tool') {
@@ -60,18 +70,24 @@ export class QwenProvider implements LLMProvider {
 
   constructor(apiKey?: string, baseURL?: string) {
     const key = apiKey ?? process.env.DASHSCOPE_API_KEY;
-    const url = baseURL ?? process.env.DASHSCOPE_BASE_URL;
+    const url =
+      baseURL ??
+      process.env.DASHSCOPE_BASE_URL ??
+      'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
     if (!key) {
-      throw new Error('DASHSCOPE_API_KEY is required. Copy .env.example to .env');
-    }
-    if (!url) {
-      throw new Error('DASHSCOPE_BASE_URL is required. Copy .env.example to .env');
+      throw new Error(
+        'DASHSCOPE_API_KEY is required. Set it in your shell environment or .env file.',
+      );
     }
 
     this.client = new OpenAI({ apiKey: key, baseURL: url });
   }
 
+  /**
+   * 流式 chat 调用
+   * yield StreamEvent 供 UI 实时渲染；return CompletedChat 供 AgentLoop 决策
+   */
   async *chat(params: ChatParams): AsyncGenerator<StreamEvent, CompletedChat> {
     const accumulator = new ToolCallAccumulator();
     let content = '';
@@ -85,7 +101,7 @@ export class QwenProvider implements LLMProvider {
         tools: params.tools?.length ? toOpenAITools(params.tools) : undefined,
         stream: true,
         stream_options: { include_usage: true },
-        parallel_tool_calls: true,
+        parallel_tool_calls: true, // 允许模型一次返回多个 tool_call
       },
       { signal: params.signal },
     );

@@ -19,18 +19,26 @@ Built with **TypeScript + Node**, powered by **Alibaba Qwen** (DashScope OpenAI-
 # 1. Install dependencies
 npm install
 
-# 2. Configure API key
-cp .env.example .env
-# Edit .env with your DASHSCOPE_API_KEY
+# 2. Configure API key (shell env or .env)
+export DASHSCOPE_API_KEY=sk-xxx
+# DASHSCOPE_BASE_URL is optional; defaults to Beijing compatible endpoint
 
-# 3. Run
-npm run dev
+# 3. Global install (run once from OmniCode repo)
+npm run build && npm link
 
-# Single-shot
-npm run dev -- run "List all TypeScript files in src/"
+# Ensure node bin is on PATH (Homebrew node@22):
+# export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 
-# List sessions
-npm run dev -- sessions
+# 4. Use from any project directory
+cd ~/work/your-project
+omni
+```
+
+Config is resolved in order: `./omni.config.yaml` → `~/.omni/config.yaml` → package default.
+
+Optional: copy global config once:
+```bash
+mkdir -p ~/.omni && cp /path/to/OmniCode/omni.config.yaml ~/.omni/config.yaml
 ```
 
 ## Requirements

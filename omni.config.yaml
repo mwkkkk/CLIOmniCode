@@ -39,6 +39,9 @@ agents:
 memory:
   reflection_confidence_threshold: 0.7
   semantic_recall_top_k: 5
+  procedural_recall_top_k: 3
+  episodic_recall_top_k: 3
+  entity_recall_top_k: 10
 
 session:
   data_dir: ~/.omni

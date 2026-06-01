@@ -1,5 +1,13 @@
 #!/usr/bin/env node
-import 'dotenv/config';
+/**
+ * OmniCode CLI 入口
+ *
+ * 使用 Commander.js 注册子命令，是用户与 OmniCode 交互的顶层入口：
+ * - omni / omni chat  → 交互式 REPL
+ * - omni run <prompt> → 单次问答（print 模式）
+ * - omni sessions     → 列出当前项目的会话
+ */
+import 'dotenv/config'; // 加载 .env；不覆盖已存在的 shell 环境变量
 import { resolve } from 'node:path';
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -13,6 +21,7 @@ program
   .description('OmniCode — terminal-native agentic coding CLI')
   .version('0.1.0');
 
+/** 默认命令：启动交互 REPL，cwd 默认为当前终端所在目录 */
 program
   .command('chat', { isDefault: true })
   .description('Start interactive REPL (default)')
@@ -21,6 +30,7 @@ program
     await startRepl(resolve(opts.cwd));
   });
 
+/** 单次模式：执行一条 prompt 后退出，适合脚本或快速提问 */
 program
   .command('run')
   .description('Single-shot query (print mode)')
@@ -31,6 +41,7 @@ program
     const engine = new SessionEngine();
     const cwd = resolve(opts.cwd);
 
+    // 危险工具执行前的确认回调（write/edit/bash/dispatch）
     const askUser = async (question: string): Promise<string> => {
       process.stdout.write(chalk.yellow(`\n${question}\n> `));
       return new Promise((resolveAnswer) => {
@@ -43,13 +54,14 @@ program
       cwd,
       sessionId: opts.session,
       askUser,
-      onText: (text) => process.stdout.write(text),
+      onText: (text) => process.stdout.write(text), // 流式输出 token
     });
 
     process.stdout.write('\n');
     console.log(chalk.gray(`\n[session ${result.sessionId} · ${result.turns} turns]`));
   });
 
+/** 列出会话；注意：只显示与 --cwd 对应项目的 session（按 projectHash 过滤） */
 program
   .command('sessions')
   .description('List sessions for current project')

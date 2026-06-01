@@ -1,3 +1,13 @@
+/**
+ * Agent 路由器（AgentRouter）
+ *
+ * 处理 Conductor 的 dispatch 工具调用：
+ * 1. 根据 agent 名称查找配置（工具集、模型、max_turns）
+ * 2. 启动独立的 AgentLoop 运行子 Agent
+ * 3. 将结果包装为 HandoffReport 返回
+ *
+ * 与 Claude Code 的 AgentTool 类似，但用显式 HandoffReport 替代纯文本 tool_result。
+ */
 import { randomUUID } from 'node:crypto';
 import { loadConfig } from '../config/load-config.js';
 import { AgentLoop } from '../engine/AgentLoop.js';
@@ -8,6 +18,7 @@ import { handoffToToolResult, type HandoffReport } from './types.js';
 import { createToolRegistry } from '../tools/registry.js';
 import type { ToolContext } from '../tools/types.js';
 
+/** dispatch 工具中的 agent 名 → ModelRouter 角色 */
 const AGENT_ROLE_MAP: Record<string, AgentRole> = {
   planner: 'planner',
   explorer: 'explorer',
@@ -32,6 +43,7 @@ export class AgentRouter {
     private modelRouter: ModelRouter,
   ) {}
 
+  /** 同步派发：阻塞等待子 Agent 完成，返回 HandoffReport */
   async dispatch(params: DispatchParams): Promise<HandoffReport> {
     const role = AGENT_ROLE_MAP[params.agent];
     if (!role) {
@@ -64,6 +76,7 @@ export class AgentRouter {
       maxTurns: profile.max_turns,
       agentId: params.agent,
       systemPrompt: buildSubAgentPrompt(params.agent, params.task),
+      permissionMode: 'ask', // 子 Agent 的 write/bash 也需用户确认
     });
 
     const result = await loop.run({
@@ -90,7 +103,7 @@ export class AgentRouter {
   }
 }
 
-function buildSubAgentPrompt(agentId: string, task: string): string {
+function buildSubAgentPrompt(agentId: string, _task: string): string {
   return [
     `You are the ${agentId} specialist agent in OmniCode.`,
     'Complete the assigned task using only your allowed tools.',

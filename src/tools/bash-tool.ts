@@ -1,3 +1,9 @@
+/**
+ * Bash 命令执行工具
+ *
+ * 在 cwd 下通过 bash -lc 执行命令，拥有与用户相同的 shell 权限。
+ * 仅有简单黑名单拦截，不是完整沙箱。
+ */
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { z } from 'zod';
@@ -5,8 +11,9 @@ import type { Tool } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
+/** 极简危险命令黑名单（不能替代用户确认） */
 const BLOCKED_PATTERNS = [
-  /\brm\s+-rf\s+\//,
+  /\brm\s+-rf\s+\//, // rm -rf /
   /\bsudo\b/,
   /\bmkfs\b/,
   /\bdd\s+if=/,
@@ -40,8 +47,8 @@ export const bashTool: Tool<{ command: string; description?: string }> = {
     try {
       const { stdout, stderr } = await execFileAsync('bash', ['-lc', input.command], {
         cwd: context.cwd,
-        maxBuffer: 1024 * 1024,
-        timeout: 120_000,
+        maxBuffer: 1024 * 1024, // 1MB 输出上限
+        timeout: 120_000, // 120 秒超时
       });
 
       const output = [stdout, stderr].filter(Boolean).join('\n').trim();
