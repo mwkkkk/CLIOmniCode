@@ -106,9 +106,18 @@ export class AgentRouter {
 }
 
 function buildSubAgentPrompt(agentId: string, _task: string): string {
-  return [
+  const lines = [
     `You are the ${agentId} specialist agent in OmniCode.`,
     'Complete the assigned task using only your allowed tools.',
     'When finished, provide a concise summary of what you found or changed.',
-  ].join('\n');
+  ];
+
+  if (agentId === 'verifier' || agentId === 'coder') {
+    lines.push(
+      'For shell commands you must call the bash tool and return its real output.',
+      'Never invent or simulate terminal output.',
+    );
+  }
+
+  return lines.join('\n');
 }

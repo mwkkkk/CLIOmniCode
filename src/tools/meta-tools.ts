@@ -40,7 +40,7 @@ export const dispatchTool: Tool<{
 }> = {
   name: 'dispatch',
   description:
-    'Delegate a sub-task to a specialist agent (planner, explorer, coder, reviewer, verifier). Returns a structured handoff report.',
+    'Delegate a sub-task to a specialist agent (planner, explorer, coder, reviewer, verifier). Use verifier for shell commands (e.g. ls, git, npm test). Returns a structured handoff report.',
   parameters: {
     type: 'object',
     properties: {
