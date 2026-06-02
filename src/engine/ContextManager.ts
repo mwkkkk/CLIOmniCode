@@ -57,6 +57,15 @@ export class ContextManager {
       MEMORY_DRIFT_DEFENSE,
     ];
 
+    if (options.agentId === 'conductor') {
+      parts.push(
+        '',
+        '## Shell commands',
+        'You do not have the bash tool. To run any shell command, dispatch to agent "verifier" with the exact command in the task.',
+        'Never fabricate, simulate, or guess command output — only report output returned by tools.',
+      );
+    }
+
     const omniMd = await this.readProjectFile(options.cwd, 'OMNI.md');
     if (omniMd) {
       parts.push('', '## Project Memory (OMNI.md)', omniMd);

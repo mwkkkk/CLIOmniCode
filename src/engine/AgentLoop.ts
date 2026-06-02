@@ -129,6 +129,23 @@ export class AgentLoop {
     };
   }
 
+  /** 危险操作（write/edit/bash/dispatch）在 ask 模式下需用户确认 */
+  private async confirmDestructiveTool(
+    name: string,
+    input: unknown,
+    runOptions: RunOptions,
+  ): Promise<boolean> {
+    if (this.options.permissionMode !== 'ask') return true;
+
+    const tool = this.options.tools.get(name);
+    if (!tool || tool.isReadOnly || !tool.isDestructive) return true;
+
+    const approved = await runOptions.askUser(
+      `Allow ${name} with input: ${JSON.stringify(input).slice(0, 200)}? (y/n)`,
+    );
+    return /^y(es)?$/i.test(approved.trim());
+  }
+
   /**
    * 执行单个 tool_call
    * dispatch 走 AgentRouter 特殊路径；其余走 ToolRegistry
@@ -143,21 +160,6 @@ export class AgentLoop {
       return JSON.stringify({ success: false, error: 'Invalid tool arguments JSON' });
     }
 
-    // dispatch 不由 meta-tools.execute 处理，而是启动子 Agent
-    if (name === 'dispatch' && this.options.agentRouter) {
-      const args = input as { agent: string; task: string; run_mode?: 'sync' | 'async' };
-      const report = await this.options.agentRouter.dispatch({
-        agent: args.agent,
-        task: args.task,
-        runMode: args.run_mode,
-        parentSessionId: runOptions.sessionId,
-        cwd: runOptions.cwd,
-        askUser: runOptions.askUser,
-        onText: runOptions.onText,
-      });
-      return this.options.agentRouter.formatHandoff(report);
-    }
-
     const tool = this.options.tools.get(name);
     if (!tool) {
       return JSON.stringify({ success: false, error: `Unknown tool: ${name}` });
@@ -168,18 +170,23 @@ export class AgentLoop {
       return JSON.stringify({ success: false, error: parsed.error.message });
     }
 
-    // 危险操作（write/edit/bash/dispatch）在 ask 模式下需用户确认
-    if (
-      this.options.permissionMode === 'ask' &&
-      !tool.isReadOnly &&
-      tool.isDestructive
-    ) {
-      const approved = await runOptions.askUser(
-        `Allow ${name} with input: ${JSON.stringify(parsed.data).slice(0, 200)}? (y/n)`,
-      );
-      if (!/^y(es)?$/i.test(approved.trim())) {
-        return JSON.stringify({ success: false, error: 'User denied permission' });
-      }
+    if (!(await this.confirmDestructiveTool(name, parsed.data, runOptions))) {
+      return JSON.stringify({ success: false, error: 'User denied permission' });
+    }
+
+    // dispatch 不由 meta-tools.execute 处理，而是启动子 Agent
+    if (name === 'dispatch' && this.options.agentRouter) {
+      const args = parsed.data as { agent: string; task: string; run_mode?: 'sync' | 'async' };
+      const report = await this.options.agentRouter.dispatch({
+        agent: args.agent,
+        task: args.task,
+        runMode: args.run_mode,
+        parentSessionId: runOptions.sessionId,
+        cwd: runOptions.cwd,
+        askUser: runOptions.askUser,
+        onText: runOptions.onText,
+      });
+      return this.options.agentRouter.formatHandoff(report);
     }
 
     const context: ToolContext = {
